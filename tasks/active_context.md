@@ -4,7 +4,7 @@
 - Motor + render + editor + assistente prontos. tsc limpo, 28 testes, build ok.
 - Roteiros CDP (`provas/r1..r3.json`) validaram: assistente completo, selecionar/arrastar mesa, Ctrl+Z,
   apagar sala + desfazer, recusa de sala sobreposta, novo andar, todas as abas, catálogo com miniaturas.
-- Git local inicializado; **sem remote**.
+- No ar: https://vigattibla.github.io/turmeo-motor/ (push no main publica).
 
 ## Próximo
 - Usuário testa e pede ajustes/itens novos no catálogo e modelos.

@@ -5,7 +5,8 @@ salas, móveis e pessoas para qualquer empresa (multi-tenant). Depois entra no
 `escritorio-village` como o editor de criação definitivo.
 
 ## Regras
-- **Git só local.** Sem remote, sem push, até o usuário liberar a integração.
+- Repo público `Vigattibla/turmeo-motor`; push no `main` publica no GitHub Pages (`.github/workflows/pages.yml`).
+  Integração no `escritorio-village` só por branch + PR.
 - `D:/Projetos/escritorio-village` é referência (v0), somente leitura.
 - Motor (`src/motor`) é TS puro, sem DOM. Desenho em `src/render` (canvas 2D). React só em `src/editor`.
 - Toda edição é um `Cmd` puro (`Doc => Doc`) que lança `Recusa`; o editor passa pelo `Historico`.
