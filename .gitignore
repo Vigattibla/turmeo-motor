@@ -4,3 +4,4 @@ dist
 .vite
 provas/*.png
 .claude/
+*.tsbuildinfo

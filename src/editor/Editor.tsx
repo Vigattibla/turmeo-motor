@@ -3,7 +3,7 @@
  * Toda mudança passa por um comando puro no Historico — desfazer/refazer de graça.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { abrir, exportar, novoDoc } from '../motor/doc'
+import { abrir } from '../motor/doc'
 import { Historico } from '../motor/comandos'
 import * as cmd from '../motor/comandos'
 import { regerar } from '../motor/gerador'
@@ -16,21 +16,25 @@ import { T } from '../render/base'
 import { desenharAndar, type Selecao } from '../render/andar'
 import { Assistente } from './Assistente'
 import { Catalogo, Inspetor, Pessoas, Problemas, Setores, TemaPainel } from './paineis'
-import { baixar, escolherArquivo, gravarLocal, lerLocal } from './util'
+import { baixar, escolherArquivo } from './util'
+import { salvar } from './loja'
 
 export type Ferramenta = 'sel' | 'add' | 'piso' | 'div' | 'sala' | 'porta' | 'vidro' | 'apagar' | 'entrada'
+/** as quatro primeiras ficam sempre à vista; o resto em "Mais" */
 const FERRAMENTAS: { id: Ferramenta; nome: string; icone: string; dica: string }[] = [
-  { id: 'sel', nome: 'Selecionar', icone: '↖', dica: 'Clique pra selecionar; arraste pra mover. Canto de baixo da sala muda o tamanho.' },
-  { id: 'add', nome: 'Móvel', icone: '▣', dica: 'Escolha no Catálogo e clique onde vai.' },
-  { id: 'piso', nome: 'Piso', icone: '▦', dica: 'Arraste pra pintar. No corredor troca o piso inteiro.' },
+  { id: 'sel', nome: 'Mover', icone: '↖', dica: 'Clique numa sala ou móvel pra ver e mudar; arraste pra mover. O quadradinho amarelo no canto da sala muda o tamanho.' },
+  { id: 'add', nome: 'Móvel', icone: '▣', dica: 'Escolha um móvel na aba Móveis e clique onde ele vai.' },
+  { id: 'sala', nome: 'Nova sala', icone: '⬚', dica: 'Arraste no corredor pra desenhar a sala (precisa de pelo menos 8 quadradinhos de cada lado).' },
+  { id: 'apagar', nome: 'Apagar', icone: '⌫', dica: 'Clique num móvel pra tirar. Pra apagar a sala inteira, selecione e aperte Delete.' },
+  { id: 'piso', nome: 'Piso', icone: '▦', dica: 'Escolha o piso na aba Móveis e arraste pra pintar. No corredor troca o piso inteiro.' },
   { id: 'div', nome: 'Divisória', icone: '┃', dica: 'Arraste pra levantar; com Shift ou botão direito, tira.' },
-  { id: 'sala', nome: 'Nova sala', icone: '⬚', dica: 'Arraste no corredor um retângulo (mínimo 8×8).' },
   { id: 'porta', nome: 'Porta', icone: '⊓', dica: 'Clique numa parede pra pôr porta; clique numa porta pra tirar.' },
   { id: 'vidro', nome: 'Vidro', icone: '◫', dica: 'Clique numa parede pra ligar/desligar o vidro daquele lado.' },
-  { id: 'apagar', nome: 'Apagar', icone: '⌫', dica: 'Clique num móvel pra tirar.' },
   { id: 'entrada', nome: 'Entrada', icone: '⇲', dica: 'Clique no corredor onde a pessoa chega no andar.' },
 ]
+const BASICAS = 4
 type Aba = 'inspetor' | 'catalogo' | 'setores' | 'pessoas' | 'problemas' | 'tema'
+const DICA_VISTA = 'turmeo-motor:dica-vista'
 
 type Arrasto =
   | { tipo: 'obj'; sala: string; id: number; dx: number; dy: number; recusa?: string | null }
@@ -41,11 +45,6 @@ type Arrasto =
   | { tipo: 'ret'; x0: number; y0: number }
   | { tipo: 'pan'; sx: number; sy: number; l: number; t: number }
 
-function docInicial(): { doc: Doc; novo: boolean } {
-  const txt = lerLocal()
-  if (txt) try { return { doc: abrir(txt).doc, novo: false } } catch { /* salvo quebrado: começa limpo */ }
-  return { doc: novoDoc({ nome: 'Nova empresa' }), novo: true }
-}
 
 /** qual parede o tile local toca; null = miolo */
 function ladoDe(s: Sala, lx: number, ly: number): { lado: Lado; pos: number } | null {
@@ -55,8 +54,8 @@ function ladoDe(s: Sala, lx: number, ly: number): { lado: Lado; pos: number } | 
   return null
 }
 
-export function Editor() {
-  const ini = useMemo(docInicial, [])
+export function Editor({ inicial, voltar }: { inicial: Doc; voltar: () => void }) {
+  const ini = useMemo(() => ({ doc: inicial }), [inicial])
   const hist = useMemo(() => new Historico(ini.doc), [ini])
   const [doc, setDoc] = useState(ini.doc)
   const [, setVer] = useState(0)
@@ -72,7 +71,12 @@ export function Editor() {
   const [grade, setGrade] = useState(false)
   const [aba, setAba] = useState<Aba>('inspetor')
   const [aviso, setAviso] = useState<string | null>(null)
-  const [assistente, setAssistente] = useState(ini.novo)
+  const [assistente, setAssistente] = useState(false)
+  const [mais, setMais] = useState(false)
+  const [menu, setMenu] = useState(false)
+  const [salvo, setSalvo] = useState(true)
+  const [dica, setDica] = useState(() => { try { return !localStorage.getItem(DICA_VISTA) } catch { return false } })
+  const fecharDica = () => { setDica(false); try { localStorage.setItem(DICA_VISTA, '1') } catch { /* sem armazenamento */ } }
 
   const canvas = useRef<HTMLCanvasElement>(null)
   const palco = useRef<HTMLDivElement>(null)
@@ -83,8 +87,13 @@ export function Editor() {
   const avisar = useCallback((m: string | null) => { setAviso(m); if (m) setTimeout(() => setAviso(a => a === m ? null : a), 4000) }, [])
   const aplicar = useCallback((c: cmd.Cmd, chave?: string) => { const r = hist.aplicar(c, chave); if (r) avisar(r); return r }, [hist, avisar])
 
-  // salvar sozinho (localStorage), sem travar a digitação
-  useEffect(() => { const t = setTimeout(() => gravarLocal(exportar(doc)), 400); return () => clearTimeout(t) }, [doc])
+  // salvar sozinho (no navegador), sem travar a digitação
+  const primeiro = useRef(true)
+  useEffect(() => {
+    if (primeiro.current) { primeiro.current = false; return }
+    setSalvo(false)
+    const t = setTimeout(() => { salvar(doc); setSalvo(true) }, 400); return () => clearTimeout(t)
+  }, [doc])
   // seleção que sumiu (desfazer, regerar) é limpa
   useEffect(() => {
     if (!doc.andares.some(a => a.id === andarId)) setAndarId(doc.andares[0].id)
@@ -267,7 +276,7 @@ export function Editor() {
     if (ctrl && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) hist.refazer(); else hist.desfazer(); return }
     if (ctrl && e.key.toLowerCase() === 'y') { e.preventDefault(); hist.refazer(); return }
     if (ctrl) return
-    if (e.key === 'Escape') { setSel({}); setFerramenta('sel'); ret.current = null; arrasto.current = null; return }
+    if (e.key === 'Escape') { setSel({}); setFerramenta('sel'); setMenu(false); ret.current = null; arrasto.current = null; return }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (sel.sala && sel.obj != null) aplicar(cmd.objDel(sel.sala, sel.obj))
       else if (sel.corredor != null) aplicar(cmd.corredorDel(andar.id, sel.corredor))
@@ -311,18 +320,19 @@ export function Editor() {
     try {
       const r = abrir(txt)
       hist.aplicar(cmd.substituir(r.doc)); setAndarId(r.doc.andares[0].id); setSel({})
-      avisar(`${r.migrado ? 'Arquivo antigo do Turmeo convertido. ' : ''}${erros(r.problemas).length} erro(s), ${r.problemas.length - erros(r.problemas).length} aviso(s).`)
+      const n = erros(r.problemas).length
+      avisar(`Arquivo carregado.${n ? ` Tem ${n} coisa(s) pra arrumar: veja a aba Conferir.` : ''}`)
     } catch (e) { avisar(e instanceof Error ? e.message : 'Não abriu') }
   }
   const exportarV0 = () => {
     const { v0, avisos } = paraV0(doc)
     baixar(`${doc.empresa.nome || 'turmeo'}-v0.json`, JSON.stringify(v0, null, 2))
-    avisar(avisos.length ? `Exportado com ${avisos.length} perda(s): ${avisos[0]}${avisos.length > 1 ? '…' : ''}` : 'Exportado no formato antigo, sem perdas.')
+    avisar(avisos.length ? `Baixado, mas ${avisos.length} coisa(s) não cabem no formato antigo: ${avisos[0]}${avisos.length > 1 ? '…' : ''}` : 'Baixado no formato antigo, sem perdas.')
   }
   const gerarDeNovo = () => {
     const r = regerar(doc)
     hist.aplicar(cmd.substituir(r.doc)); setSel({})
-    avisar(`Gerado de novo (semente ${r.seed}). ${erros(r.problemas).length ? erros(r.problemas).length + ' erro(s) pra olhar.' : 'Sem erros.'}`)
+    avisar(erros(r.problemas).length ? 'Salas rearrumadas. Tem coisa pra arrumar: veja a aba Conferir.' : 'Salas rearrumadas. Não gostou? Ctrl+Z volta.')
   }
   const focar = (salaId?: string, andarAlvo?: string, obj?: number) => {
     if (andarAlvo) setAndarId(andarAlvo)
@@ -336,50 +346,74 @@ export function Editor() {
 
   const ferr = FERRAMENTAS.find(f => f.id === ferramenta)!
   const cursor = ferramenta === 'sel' ? 'default' : 'crosshair'
+  const avancada = FERRAMENTAS.findIndex(f => f.id === ferramenta) >= BASICAS
+  const verMais = mais || avancada
+  const item = (f: () => void) => () => { setMenu(false); f() }
 
   return (
     <div className="ed">
       <header className="ed-topo">
-        <div className="ed-marca"><b>Turmeo</b><span>motor de layout</span></div>
-        <input className="ed-empresa" value={doc.empresa.nome} onChange={e => aplicar(cmd.empresa({ nome: e.target.value }), 'empresa')} onBlur={() => hist.selar()} aria-label="Nome da empresa" />
+        <button className="ed-voltar" onClick={() => { salvar(doc); voltar() }} title="Voltar pra tela inicial">← Meus escritórios</button>
+        <input className="ed-empresa" value={doc.empresa.nome} onChange={e => aplicar(cmd.empresa({ nome: e.target.value }), 'empresa')} onBlur={() => hist.selar()} aria-label="Nome do escritório" placeholder="Nome do escritório" />
         <nav className="ed-andares">
           {doc.andares.map(a => <button key={a.id} className={a.id === andar.id ? 'on' : ''} onClick={() => { setAndarId(a.id); setSel({}) }}>{a.nome}</button>)}
-          <button title="Novo andar" onClick={novoAndar}>＋</button>
+          <button title="Pôr mais um andar" onClick={novoAndar}>＋ andar</button>
         </nav>
         <div className="ed-acoes">
-          <button onClick={() => hist.desfazer()} disabled={!hist.podeDesfazer} title="Desfazer (Ctrl+Z)">↶</button>
-          <button onClick={() => hist.refazer()} disabled={!hist.podeRefazer} title="Refazer (Ctrl+Y)">↷</button>
-          <span className="ed-sep" />
-          <button onClick={() => setAssistente(true)}>Assistente</button>
-          <button onClick={gerarDeNovo} title="Mesmos setores e pessoas, outro arranjo. Salas travadas ficam.">Gerar de novo</button>
-          <button onClick={() => aplicar(cmd.distribuir(false))} title="Põe quem está sem mesa numa mesa livre do setor">Distribuir pessoas</button>
-          <span className="ed-sep" />
-          <button onClick={abrirArquivo} title="Abre .json do motor ou do Turmeo antigo">Abrir</button>
-          <button onClick={() => baixar(`${doc.empresa.nome || 'turmeo'}.json`, JSON.stringify(doc, null, 2))}>Exportar</button>
-          <button onClick={exportarV0} title="Formato que o Turmeo de hoje lê">Exportar v0</button>
+          <span className="ed-salvo" aria-live="polite">{salvo ? '✓ Salvo' : 'Salvando…'}</span>
+          <button onClick={() => hist.desfazer()} disabled={!hist.podeDesfazer} title="Desfazer (Ctrl+Z)">↶ Desfazer</button>
+          <button onClick={() => hist.refazer()} disabled={!hist.podeRefazer} title="Refazer (Ctrl+Y)" aria-label="Refazer">↷</button>
+          <span className="ed-menu-ancora">
+            <button onClick={() => setMenu(m => !m)} aria-expanded={menu}>⋯ Mais</button>
+            {menu && <div className="ed-menu" role="menu">
+              <button onClick={item(() => aplicar(cmd.distribuir(false)))}>Pôr quem está sem mesa numa mesa livre</button>
+              <button onClick={item(gerarDeNovo)}>Rearrumar as salas sozinho</button>
+              <button onClick={item(() => setAssistente(true))}>Refazer com o assistente (nomes, salas…)</button>
+              <hr />
+              <button onClick={item(() => baixar(`${doc.empresa.nome || 'escritorio'}.json`, JSON.stringify(doc, null, 2)))}>Baixar cópia do arquivo</button>
+              <button onClick={item(abrirArquivo)}>Carregar arquivo…</button>
+              <details><summary>Avançado</summary>
+                <button onClick={item(exportarV0)}>Baixar no formato do Turmeo antigo</button>
+                <button onClick={item(() => setGrade(g => !g))}>{grade ? 'Esconder' : 'Mostrar'} a grade (G)</button>
+              </details>
+            </div>}
+          </span>
         </div>
       </header>
 
       <aside className="ed-ferr">
-        {FERRAMENTAS.map((f, i) => (
+        {FERRAMENTAS.map((f, i) => (i < BASICAS || verMais) && (
           <button key={f.id} className={f.id === ferramenta ? 'on' : ''} onClick={() => { setFerramenta(f.id); if (f.id === 'add' || f.id === 'piso') setAba('catalogo') }} title={`${f.nome} (${i + 1})`}>
             <span>{f.icone}</span><small>{f.nome}</small>
           </button>
         ))}
+        <button className="ed-ferr-mais" onClick={() => { if (verMais) { setMais(false); if (avancada) setFerramenta('sel') } else setMais(true) }}>
+          <span>{verMais ? '−' : '…'}</span><small>{verMais ? 'Menos' : 'Mais'}</small>
+        </button>
       </aside>
 
-      <main className="ed-palco" ref={palco} onContextMenu={e => e.preventDefault()}>
+      <main className="ed-palco" ref={palco} onContextMenu={e => e.preventDefault()} onMouseDown={() => setMenu(false)}>
         <canvas
           ref={canvas}
           style={{ width: andar.w * T * zoom, height: andar.h * T * zoom, cursor }}
           onMouseDown={baixo} onMouseMove={mover} onMouseUp={cima}
           onMouseLeave={() => { mouse.current = null; cima() }}
         />
+        {dica && <div className="ed-dica" onMouseDown={e => e.stopPropagation()}>
+          <b>Pronto! Seu escritório já está montado.</b>
+          <ul>
+            <li>Clique numa sala pra trocar o nome; arraste pra mudar de lugar.</li>
+            <li>Arraste uma mesa ou móvel pra reposicionar.</li>
+            <li>Na aba <b>Pessoas</b> você escreve os nomes de verdade.</li>
+            <li>Errou? <b>↶ Desfazer</b> (Ctrl+Z). Tudo salva sozinho.</li>
+          </ul>
+          <button className="prim" onClick={fecharDica}>Entendi</button>
+        </div>}
       </main>
 
       <section className="ed-lado">
         <nav className="ed-abas">
-          {([['inspetor', 'Inspetor'], ['catalogo', 'Catálogo'], ['setores', 'Setores'], ['pessoas', 'Pessoas'], ['problemas', `Problemas${problemas.length ? ` (${problemas.length})` : ''}`], ['tema', 'Tema']] as [Aba, string][]).map(([id, nome]) =>
+          {([['inspetor', 'Selecionado'], ['catalogo', 'Móveis'], ['pessoas', 'Pessoas'], ['setores', 'Setores'], ['tema', 'Cores'], ['problemas', nErros ? `Conferir (${nErros})` : 'Conferir']] as [Aba, string][]).map(([id, nome]) =>
             <button key={id} className={(aba === id ? 'on ' : '') + (id === 'problemas' && nErros ? 'erro' : '')} onClick={() => setAba(id)}>{nome}</button>)}
         </nav>
         <div className="ed-painel">
@@ -395,17 +429,15 @@ export function Editor() {
       <footer className="ed-rodape">
         <span><b>{ferr.nome}:</b> {ferr.dica}</span>
         <span className="ed-zoom">
-          <label><input type="checkbox" checked={grade} onChange={e => setGrade(e.target.checked)} /> grade (G)</label>
-          <button onClick={() => setZoom(z => Math.max(0.5, z - 0.5))}>−</button>
+          <button onClick={() => setZoom(z => Math.max(0.5, z - 0.5))} aria-label="Afastar">−</button>
           {Math.round(zoom * 100)}%
-          <button onClick={() => setZoom(z => Math.min(4, z + 0.5))}>＋</button>
-          <button onClick={ajustar} title="Ajustar à tela (0)">⤢</button>
-          <span className="ed-dim">{andar.w}×{andar.h} · {andar.salas.length} salas · {doc.pessoas.length} pessoas</span>
+          <button onClick={() => setZoom(z => Math.min(4, z + 0.5))} aria-label="Aproximar">＋</button>
+          <button onClick={ajustar} title="Caber na tela (0)">⤢ Caber</button>
         </span>
       </footer>
 
       {aviso && <div className="ed-aviso" role="status" onClick={() => setAviso(null)}>{aviso}</div>}
-      {assistente && <Assistente doc={doc} podeFechar={!ini.novo || hist.podeDesfazer} fechar={() => setAssistente(false)} usar={d => { hist.aplicar(cmd.substituir(d)); setAndarId(d.andares[0].id); setSel({}); setAssistente(false); avisar('Layout criado. Agora é só ajustar.') }} />}
+      {assistente && <Assistente doc={doc} podeFechar fechar={() => setAssistente(false)} usar={d => { hist.aplicar(cmd.substituir({ ...d, id: doc.id })); setAndarId(d.andares[0].id); setSel({}); setAssistente(false); avisar('Layout refeito. Não gostou? Ctrl+Z volta.') }} />}
     </div>
   )
 }

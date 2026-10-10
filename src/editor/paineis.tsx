@@ -251,7 +251,7 @@ export function Pessoas({ doc, aplicar, selar, focar }: { doc: Doc; aplicar: Apl
                 <div key={p.id} className="pn-linha">
                   <input value={p.nome} onChange={e => aplicar(cmd.pessoaEditar(p.id, { nome: e.target.value }), 'pn-' + p.id)} onBlur={selar} />
                   <label className="pn-check" title="Chefia"><input type="checkbox" checked={!!p.chefe} onChange={e => aplicar(cmd.pessoaEditar(p.id, { chefe: e.target.checked }))} />★</label>
-                  {w ? <button className="pn-mesa" onClick={() => focar(w.s.id, w.a.id, w.o?.id)}>{p.mesa!.d === CHEFE ? 'chefia' : `mesa ${p.mesa!.d}`}</button> : <span className="pn-sem">sem mesa</span>}
+                  {w ? <button className="pn-mesa" onClick={() => focar(w.s.id, w.a.id, w.o?.id)}>{p.mesa!.d === CHEFE ? 'chefia' : `mesa ${p.mesa!.d + 1}`}</button> : <span className="pn-sem">sem mesa</span>}
                   <button className="perigo" onClick={() => aplicar(cmd.pessoaDel(p.id))}>✕</button>
                 </div>
               )
