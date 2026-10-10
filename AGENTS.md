@@ -26,7 +26,7 @@ Dev server: preview `motor` (porta 5190) no launch.json da pasta Designe Village
 ## Mapa
 - `src/motor`: tipos, doc (abrir/exportar/migrar), gerador (planejar → empacotar → mobiliar), comandos + Historico, validar (alcance/caminho), modelos, catálogo, pessoas
 - `src/render`: andar, sala, mesa, portas, bandeira, tokens (tema da empresa)
-- `src/editor`: Editor (canvas + ferramentas), paineis (Inspetor/Catálogo/Setores/Pessoas/Problemas/Tema), Assistente (wizard), util
+- `src/editor`: App (rota `#/e/<id>`: Inicio ou Editor), Inicio (Meus escritórios + Criar numa tela), loja (localStorage `turmeo-motor:escritorios` + `:esc:<id>`, migra `turmeo-motor:doc`), Editor (canvas + ferramentas, salva sozinho), paineis (Inspetor/Catálogo/Setores/Pessoas/Problemas/Tema), Assistente (wizard), util
 - `src/index.ts`: API pública
 - `ferramentas/cdp.mjs`: driver CDP sem dependências pra testar a UI
 

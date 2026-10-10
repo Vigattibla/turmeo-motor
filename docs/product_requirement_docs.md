@@ -8,6 +8,7 @@ espaço: setores, salas, andares, móveis, pessoas e tema. Vira o editor oficial
 - Gather / WorkAdventure: mapa em tiles, objetos com colisão, editor por camadas (chão, parede, objeto).
 - Floor planners (Floorplanner, Planner 5D): wizard → layout automático → ajuste manual.
 - Editores de nível (Tiled, LDtk): pincel de piso, ferramenta de retângulo, inspetor de propriedades, undo/redo.
+- Trello: tela inicial com quadros em cartão, criar = nome + fundo; Gather/Kumospace: criar espaço por modelo + tamanho.
 - Space management (OfficeSpace, Robin): pessoas ↔ mesas, setores com cor, relatório de problemas.
 
 ## Requisitos
@@ -19,7 +20,10 @@ espaço: setores, salas, andares, móveis, pessoas e tema. Vira o editor oficial
 6. **Editor**: ferramentas selecionar, móvel, piso, divisória, nova sala, porta, vidro, apagar, entrada; zoom, grade, pan, atalhos.
 7. **Painéis**: inspetor (mesa/objeto/sala/andar), catálogo filtrável por tema, setores, pessoas (atribuir mesa, chefia), problemas, tema de cores.
 8. **Assistente**: empresa → modelo → setores → pessoas → salas comuns → resultado com "outra opção".
-9. **Multi-tenant**: nada da Village fixo no motor; marca vem dos tokens do tema.
+9. **Tela inicial** estilo Trello: "Meus escritórios" em cartões com miniatura (abrir, renomear, duplicar, apagar) e "Começar de um modelo".
+10. **Criar numa tela só**: nome, tipo, tamanho em faixas, setores em chips, prévia ao vivo; detalhes depois no editor.
+11. **Editor simples**: 4 ferramentas básicas (Mover, Móvel, Nova sala, Apagar) + "Mais"; ações raras no menu ⋯; salva sozinho; dica no primeiro uso.
+12. **Multi-tenant**: nada da Village fixo no motor; marca vem dos tokens do tema.
 
 ## Fora do escopo agora
 Integração no `escritorio-village`, sincronização com Supabase, colaboração em tempo real.
