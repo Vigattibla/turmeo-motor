@@ -23,3 +23,8 @@ espaço: setores, salas, andares, móveis, pessoas e tema. Vira o editor oficial
 
 ## Fora do escopo agora
 Integração no `escritorio-village`, sincronização com Supabase, colaboração em tempo real.
+
+## Princípio: fácil pra quem não é técnico
+O motor é usado por outras pessoas pra criarem o próprio ambiente. Toda tela nova passa por:
+leigo consegue sem explicação? Linguagem do dia a dia (nada de "v0", "semente", "tile"), primeiro uso
+guiado pelo assistente, poucas opções visíveis por vez, avançado escondido, erro explicado com o que fazer.
