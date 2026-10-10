@@ -1,0 +1,22 @@
+[
+ {"ir":"http://localhost:5190/"},
+ {"js":"window.bt=t=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim().startsWith(t)); if(!b) return 'sem '+t; b.click(); return 'ok '+t}; 1"},
+ {"js":"bt('Continuar')"},{"js":"bt('Continuar')"},{"js":"bt('Continuar')"},{"js":"bt('Continuar')"},{"js":"bt('Gerar layout')"},{"esperar":600},{"js":"bt('Usar este layout')"},{"esperar":900},
+ {"js":"window.D=()=>JSON.parse(localStorage.getItem('turmeo-motor:doc')); window.tc=(tx,ty)=>{const c=document.querySelector('.ed-palco canvas'),r=c.getBoundingClientRect(),z=r.width/(D().andares[0].w*16); return [Math.round(r.left+tx*16*z), Math.round(r.top+ty*16*z)]}; window.S=()=>D().andares[0].salas.find(s=>s.tipo==='reuniao'); 1"},
+ {"js":"bt('Catálogo')"},{"print":"20-catalogo"},
+ {"tecla":"2"},
+ {"clicar":"(()=>{const s=S();return tc(s.x+2,s.y+s.h-3)})()"},
+ {"esperar":500},
+ {"js":"'objs reuniao: '+S().objs.length+' aviso: '+(document.querySelector('.ed-aviso')?.textContent??'-')"},
+ {"tecla":"1"},
+ {"clicar":"(()=>{const s=S();return tc(s.x+s.w/2,s.y+s.h-2.5)})()"},
+ {"tecla":"Delete"},{"esperar":500},
+ {"js":"'salas: '+D().andares[0].salas.length"},
+ {"tecla":"5"},
+ {"arrastar":"(()=>{const s=S()??{x:0};const a=tc(D().andares[0].salas.reduce((m,s)=>s.y>15?Math.min(m,s.x):m,99)+0,0);return [0,0,0,0]})()"},
+ {"js":"'reuniao apagada? '+(S()===undefined)"},
+ {"tecla":"z","mod":2},{"esperar":500},
+ {"js":"'voltou? '+(S()!==undefined)"},
+ {"print":"21-pos-undo"},
+ {"js":"bt('Problemas')"},{"print":"22-problemas"}
+]
